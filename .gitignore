@@ -1,0 +1,17 @@
+# Raw Transfermarkt Kaggle CSVs (exceed GitHub file size limits)
+dataset/*.csv
+!dataset/processed/
+!dataset/processed/players_clean.csv
+
+# Python & Jupyter
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.venv/
+venv/
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
