@@ -18,16 +18,16 @@ Folder ini menyimpan hasil pelatihan (*trained artifacts*) dari pipeline di [../
 | `best_model.joblib` | `sklearn.pipeline.Pipeline` lengkap (*preprocessor* + estimator **XGBoost**) | Digunakan untuk prediksi cepat *Fair Market Value* menggunakan model terbaik. |
 | `all_models.joblib` | `dict` berisi 3 `Pipeline`: `"Linear Regression"`, `"Random Forest"`, `"XGBoost"` | Digunakan di dashboard untuk menampilkan perbandingan hasil prediksi ketiga model secara berdampingan. |
 | `preprocessor.joblib` | `sklearn.compose.ColumnTransformer` yang sudah di-*fit* (`passthrough` numerik + `OneHotEncoder` kategorikal) | Digunakan ketika aplikasi membutuhkan matriks fitur hasil transformasi secara terpisah (misalnya untuk perhitungan nilai **SHAP**). |
-| `model_metadata.joblib` | `dict` berisi `best_model_name`, `numeric_features`, `categorical_features`, `feature_cols`, dan `evaluation_metrics` | Menyimpan daftar kolom input yang diharapkan dan metrik evaluasi (RMSE, $R^2$, MAE) agar tidak perlu di-*hardcode* di dashboard. |
+| `model_metadata.joblib` | `dict` berisi `best_model_name`, `numeric_features`, `categorical_features`, `feature_cols`, `evaluation_metrics`, dan `best_params` | Menyimpan daftar kolom input yang diharapkan, metrik evaluasi (RMSE, $R^2$, MAE), dan hyperparameter terbaik agar tidak perlu di-*hardcode* di dashboard. |
 
 ---
 
 ## Fitur Input yang Dibutuhkan
 
-Model menerima DataFrame dengan **19 kolom input** (`16` numerik + `3` kategorikal) sesuai dataset bersih [../dataset/processed/players_clean.csv](../dataset/processed/players_clean.csv):
+Model menerima DataFrame dengan **23 kolom input** (`20` numerik + `3` kategorikal) sesuai dataset bersih [../dataset/processed/players_clean.csv](../dataset/processed/players_clean.csv):
 
-- **Fitur Numerik (16):**
-  `age`, `height_in_cm`, `contract_months_left`, `total_minutes`, `minutes_per_match`, `goals_per_90`, `assists_per_90`, `yellow_cards_per_90`, `red_cards_per_90`, `international_caps`, `cl_appearances`, `el_appearances`, `is_top5_league`, `club_national_team_players`, `club_stadium_seats`, `club_foreigners_pct`
+- **Fitur Numerik (20):**
+  `age`, `height_in_cm`, `contract_months_left`, `total_minutes`, `minutes_per_match`, `goals_per_90`, `assists_per_90`, `yellow_cards_per_90`, `red_cards_per_90`, `international_caps`, `cl_appearances`, `el_appearances`, `is_top5_league`, `club_national_team_players`, `club_stadium_seats`, `club_foreigners_pct`, `recent_minutes`, `recent_goals_per_90`, `recent_assists_per_90`, `recent_cl_appearances`
 - **Fitur Kategorikal (3):**
   `position`, `foot`, `league_group`
 
