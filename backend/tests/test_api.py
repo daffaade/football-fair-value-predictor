@@ -330,8 +330,34 @@ def test_post_predict(client: TestClient) -> None:
     assert body2["shap"] is None
 
 
+def test_player_image_field_and_endpoint(client: TestClient) -> None:
+    list_resp = client.get("/players", params={"limit": 5})
+    assert list_resp.status_code == 200
+    items = list_resp.json()["items"]
+    assert len(items) == 5
+    for item in items:
+        assert isinstance(item["image_url"], str) and item["image_url"].startswith(
+            "http"
+        )
+
+    player_id = items[0]["player_id"]
+    expected_url = items[0]["image_url"]
+
+    detail_resp = client.get(f"/players/{player_id}")
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["image_url"] == expected_url
+
+    image_resp = client.get(f"/players/{player_id}/image")
+    assert image_resp.status_code == 200
+    assert image_resp.json() == {
+        "player_id": player_id,
+        "image_url": expected_url,
+    }
+
+
 def test_not_found_and_validation_errors(client: TestClient) -> None:
     assert client.get("/players/999999999").status_code == 404
+    assert client.get("/players/999999999/image").status_code == 404
     assert client.get("/players/999999999/predict").status_code == 404
 
     invalid_queries = [

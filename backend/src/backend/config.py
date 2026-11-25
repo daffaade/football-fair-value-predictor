@@ -9,6 +9,9 @@ MODELS_DIR = Path(os.getenv("MODELS_DIR", str(REPO_ROOT / "models")))
 DATA_PATH = Path(
     os.getenv("DATA_PATH", str(REPO_ROOT / "dataset" / "processed" / "players_clean.csv"))
 )
+RAW_PLAYERS_PATH = Path(
+    os.getenv("RAW_PLAYERS_PATH", str(REPO_ROOT / "dataset" / "players.csv"))
+)
 
 _default_cors = [
     "http://localhost:5173",

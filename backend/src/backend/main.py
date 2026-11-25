@@ -6,9 +6,10 @@ from typing import Any, Literal
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.config import CORS_ORIGINS, DATA_PATH, MODELS_DIR
+from backend.config import CORS_ORIGINS, DATA_PATH, MODELS_DIR, RAW_PLAYERS_PATH
 from backend.schemas import (
     HealthResponse,
+    PlayerImageResponse,
     PlayerPredictResponse,
     PlayerRecord,
     PlayersListResponse,
@@ -22,7 +23,11 @@ from backend.services.predictor import FairValueService
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     service = FairValueService()
-    service.load(models_dir=MODELS_DIR, data_path=DATA_PATH)
+    service.load(
+        models_dir=MODELS_DIR,
+        data_path=DATA_PATH,
+        raw_players_path=RAW_PLAYERS_PATH,
+    )
     app.state.service = service
     yield
 
@@ -115,6 +120,14 @@ def get_player(
     if player is None:
         raise HTTPException(status_code=404, detail=f"Player {player_id} not found")
     return player
+
+
+@app.get("/players/{player_id}/image", response_model=PlayerImageResponse)
+def get_player_image(player_id: int, request: Request) -> PlayerImageResponse:
+    image = _get_service(request).get_player_image(player_id)
+    if image is None:
+        raise HTTPException(status_code=404, detail=f"Player {player_id} not found")
+    return image
 
 
 @app.post("/predict", response_model=PredictResponse)

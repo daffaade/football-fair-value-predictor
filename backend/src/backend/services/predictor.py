@@ -10,6 +10,7 @@ import shap
 
 from backend.schemas import (
     ModelPrediction,
+    PlayerImageResponse,
     PlayerRecord,
     PlayersListResponse,
     PredictResponse,
@@ -47,6 +48,14 @@ def _to_python_scalar(value: Any) -> float | int | str:
     return str(value)
 
 
+def _normalize_image_url(value: Any) -> str | None:
+    """Normalize an image URL value from pandas/CSV into a clean string or None."""
+    if value is None or pd.isna(value):
+        return None
+    cleaned = str(value).strip()
+    return cleaned if cleaned else None
+
+
 class FairValueService:
     """Loads ML artifacts and cleaned player dataset, and serves predictions, SHAP, and player queries."""
 
@@ -66,7 +75,12 @@ class FairValueService:
         self.shap_explainer: shap.TreeExplainer | None = None
         self.loaded: bool = False
 
-    def load(self, models_dir: Path, data_path: Path) -> None:
+    def load(
+        self,
+        models_dir: Path,
+        data_path: Path,
+        raw_players_path: Path | None = None,
+    ) -> None:
         """Load serialized models, metadata, preprocessor, dataset, and initialize SHAP explainer."""
         self.best_model = joblib.load(models_dir / "best_model.joblib")
         self.all_models = joblib.load(models_dir / "all_models.joblib")
@@ -79,6 +93,24 @@ class FairValueService:
         self.transformed_feature_names = list(self.preprocessor.get_feature_names_out())
 
         df = pd.read_csv(data_path)
+        if "image_url" not in df.columns:
+            if raw_players_path is not None and raw_players_path.exists():
+                raw_images = pd.read_csv(
+                    raw_players_path, usecols=["player_id", "image_url"]
+                )
+                raw_images = raw_images.dropna(subset=["player_id", "image_url"])
+                raw_images = raw_images.drop_duplicates(
+                    subset=["player_id"], keep="first"
+                )
+                image_map = dict(
+                    zip(
+                        raw_images["player_id"].astype(int),
+                        raw_images["image_url"].astype(str),
+                    )
+                )
+                df["image_url"] = df["player_id"].astype(int).map(image_map)
+            else:
+                df["image_url"] = None
 
         pred_logs = np.asarray(
             self.best_model.predict(df[self.feature_cols]), dtype=float
@@ -136,6 +168,7 @@ class FairValueService:
             "diff_eur": diff_eur,
             "diff_pct": diff_pct,
             "valuation_status": _classify_status(diff_eur, diff_pct, fair_margin_pct),
+            "image_url": _normalize_image_url(row.get("image_url")),
         }
         for col in self.numeric_features:
             if col == "is_top5_league":
@@ -348,6 +381,16 @@ class FairValueService:
             fair_margin_pct=fair_margin_pct,
         )
         return PlayerRecord(**{**row, "valuation_status": status})
+
+    def get_player_image(self, player_id: int) -> PlayerImageResponse | None:
+        """Fetch a player's image URL by player_id."""
+        row = self.players_by_id.get(int(player_id))
+        if row is None:
+            return None
+        return PlayerImageResponse(
+            player_id=row["player_id"],
+            image_url=row["image_url"],
+        )
 
     def get_metadata(self) -> dict[str, Any]:
         """Return model metadata, valid categorical options, and numeric feature ranges."""
