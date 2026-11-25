@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -eu
+cd "$(dirname "$0")"
+frontend=http://127.0.0.1:5173
+backend=http://127.0.0.1:8000
+children=()
+cleanup() {
+  for pid in "${children[@]}"; do kill "$pid" 2>/dev/null || true; done
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+ready() { curl -fsS --max-time 2 "$1" >/dev/null 2>&1; }
+wait_ready() {
+  for ((i=0; i<90; i++)); do
+    ready "$1" && return 0
+    kill -0 "$2" 2>/dev/null || break
+    sleep 1
+  done
+  echo "Gagal menjalankan $1. Periksa pesan di terminal." >&2
+  return 1
+}
+if ! ready "$backend/health"; then
+  backend/.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+  children+=("$!")
+  wait_ready "$backend/health" "$!"
+fi
+if ! ready "$frontend/api/health"; then
+  export PATH="/tmp/ffv-tools/node/bin:$PATH"
+  (cd frontend && exec node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173 --strictPort) &
+  children+=("$!")
+  wait_ready "$frontend/api/health" "$!"
+fi
+printf 'Frontend %s\nBackend %s/docs\n' "$frontend" "$backend"
+if command -v powershell.exe >/dev/null; then
+  powershell.exe -NoProfile -Command "Start-Process '$frontend'; Start-Process '$backend/docs'"
+fi
+wait
