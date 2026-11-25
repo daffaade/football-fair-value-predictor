@@ -87,6 +87,12 @@ export interface PlayerRecord extends PlayerFeatures {
   diff_eur: number
   diff_pct: number
   valuation_status: ValuationStatus
+  image_url: string | null
+}
+
+export interface PlayerImageResponse {
+  player_id: number
+  image_url: string | null
 }
 
 export interface PlayersListResponse {

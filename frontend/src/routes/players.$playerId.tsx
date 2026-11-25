@@ -3,6 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { BoundedNumberInput } from '@/components/BoundedNumberInput'
 import { ErrorBanner } from '@/components/ErrorBanner'
 import { ModelComparisonTable } from '@/components/ModelComparisonTable'
+import { PlayerAvatar } from '@/components/PlayerAvatar'
 import { ShapChart } from '@/components/ShapChart'
 import { ValuationBadge } from '@/components/ValuationBadge'
 import {
@@ -146,16 +147,22 @@ function PlayerInspectorPage() {
           {/* Player Heading */}
           <div className="rounded border border-neutral-300 bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h1 className="text-xl font-bold text-neutral-900">
-                  {query.data.player.name}
-                </h1>
-                <p className="text-sm text-neutral-600">
-                  {query.data.player.current_club_name} ·{' '}
-                  {query.data.player.league_group} ·{' '}
-                  {query.data.player.position} · Season{' '}
-                  {query.data.player.last_season}
-                </p>
+              <div className="flex items-center gap-4">
+                <PlayerAvatar
+                  src={query.data.player.image_url}
+                  name={query.data.player.name}
+                />
+                <div>
+                  <h1 className="text-xl font-bold text-neutral-900">
+                    {query.data.player.name}
+                  </h1>
+                  <p className="text-sm text-neutral-600">
+                    {query.data.player.current_club_name} ·{' '}
+                    {query.data.player.league_group} ·{' '}
+                    {query.data.player.position} · Season{' '}
+                    {query.data.player.last_season}
+                  </p>
+                </div>
               </div>
               {query.data.prediction.valuation ? (
                 <ValuationBadge

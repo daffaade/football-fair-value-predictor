@@ -4,6 +4,7 @@ import type { QueryParams } from '@/lib/api-client'
 import type {
   HealthResponse,
   MetadataResponse,
+  PlayerImageResponse,
   PlayerPredictResponse,
   PlayersListParams,
   PlayersListResponse,
@@ -72,6 +73,15 @@ export function playerPredictQueryOptions(
         },
         signal,
       }),
+  })
+}
+
+export function playerImageQueryOptions(playerId: number) {
+  return queryOptions({
+    queryKey: ['player-image', playerId],
+    queryFn: ({ signal }) =>
+      apiFetch<PlayerImageResponse>(`/players/${playerId}/image`, { signal }),
+    staleTime: 10 * 60_000,
   })
 }
 

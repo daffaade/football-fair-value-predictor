@@ -83,6 +83,12 @@ class PlayerRecord(PlayerFeatures):
     diff_eur: float
     diff_pct: float
     valuation_status: ValuationStatus
+    image_url: str | None = None
+
+
+class PlayerImageResponse(BaseModel):
+    player_id: int
+    image_url: str | None = None
 
 
 class PlayersListResponse(BaseModel):
