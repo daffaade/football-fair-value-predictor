@@ -14,6 +14,7 @@ from backend.schemas import (
     PlayersListResponse,
     PredictRequest,
     PredictResponse,
+    ValuationStatus,
 )
 from backend.services.predictor import FairValueService
 
@@ -68,9 +69,20 @@ def list_players(
     search: str | None = Query(default=None),
     position: str | None = Query(default=None),
     league_group: str | None = Query(default=None),
-    sort_by: Literal["market_value_in_eur", "age", "name", "total_minutes"] = Query(
-        default="market_value_in_eur"
-    ),
+    status: ValuationStatus | None = Query(default=None),
+    is_top5_league: int | None = Query(default=None, ge=0, le=1),
+    max_age: float | None = Query(default=None, ge=14, le=55),
+    max_contract_months: float | None = Query(default=None, ge=0),
+    fair_margin_pct: float = Query(default=10.0, ge=0, le=100),
+    sort_by: Literal[
+        "market_value_in_eur",
+        "predicted_value_eur",
+        "diff_eur",
+        "diff_pct",
+        "age",
+        "name",
+        "total_minutes",
+    ] = Query(default="market_value_in_eur"),
     order: Literal["asc", "desc"] = Query(default="desc"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -79,6 +91,11 @@ def list_players(
         search=search,
         position=position,
         league_group=league_group,
+        status=status,
+        is_top5_league=is_top5_league,
+        max_age=max_age,
+        max_contract_months=max_contract_months,
+        fair_margin_pct=fair_margin_pct,
         sort_by=sort_by,
         order=order,
         limit=limit,
@@ -87,8 +104,14 @@ def list_players(
 
 
 @app.get("/players/{player_id}", response_model=PlayerRecord)
-def get_player(player_id: int, request: Request) -> PlayerRecord:
-    player = _get_service(request).get_player(player_id)
+def get_player(
+    player_id: int,
+    request: Request,
+    fair_margin_pct: float = Query(default=10.0, ge=0, le=100),
+) -> PlayerRecord:
+    player = _get_service(request).get_player(
+        player_id, fair_margin_pct=fair_margin_pct
+    )
     if player is None:
         raise HTTPException(status_code=404, detail=f"Player {player_id} not found")
     return player
@@ -114,7 +137,7 @@ def predict_player(
     include_shap: bool = Query(default=True),
 ) -> PlayerPredictResponse:
     service = _get_service(request)
-    player = service.get_player(player_id)
+    player = service.get_player(player_id, fair_margin_pct=fair_margin_pct)
     if player is None:
         raise HTTPException(status_code=404, detail=f"Player {player_id} not found")
 

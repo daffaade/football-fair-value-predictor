@@ -16,12 +16,24 @@ from backend.schemas import (
     ShapContribution,
     ShapExplanation,
     ValuationResult,
+    ValuationStatus,
 )
 
 
 def _log_to_eur(pred_log: float) -> float:
     """Convert log1p market value prediction back to EUR scale."""
     return float(np.expm1(np.clip(float(pred_log), 0.0, 20.0)))
+
+
+def _classify_status(
+    diff_eur: float, diff_pct: float, fair_margin_pct: float
+) -> ValuationStatus:
+    """Classify valuation status using fair_margin_pct tolerance band."""
+    if abs(diff_pct) <= fair_margin_pct:
+        return "Fairly Valued"
+    if diff_eur > 0:
+        return "Undervalued"
+    return "Overvalued"
 
 
 def _to_python_scalar(value: Any) -> float | int | str:
@@ -67,6 +79,21 @@ class FairValueService:
         self.transformed_feature_names = list(self.preprocessor.get_feature_names_out())
 
         df = pd.read_csv(data_path)
+
+        pred_logs = np.asarray(
+            self.best_model.predict(df[self.feature_cols]), dtype=float
+        )
+        predicted_values = np.expm1(np.clip(pred_logs, 0.0, 20.0))
+        actual_values = df["market_value_in_eur"].to_numpy(dtype=float)
+        diff_eur = predicted_values - actual_values
+        with np.errstate(divide="ignore", invalid="ignore"):
+            diff_pct = np.where(
+                actual_values > 0, diff_eur / actual_values * 100.0, 0.0
+            )
+
+        df["predicted_value_eur"] = predicted_values
+        df["diff_eur"] = diff_eur
+        df["diff_pct"] = diff_pct
         self.players_df = df
 
         self.categorical_options = {
@@ -92,14 +119,23 @@ class FairValueService:
         self.shap_explainer = shap.TreeExplainer(estimator)
         self.loaded = True
 
-    def _normalize_player_dict(self, row: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_player_dict(
+        self, row: dict[str, Any], fair_margin_pct: float = 10.0
+    ) -> dict[str, Any]:
         """Convert a DataFrame row dict into native Python types matching PlayerRecord."""
+        predicted_value_eur = float(row["predicted_value_eur"])
+        diff_eur = float(row["diff_eur"])
+        diff_pct = float(row["diff_pct"])
         normalized: dict[str, Any] = {
             "player_id": int(row["player_id"]),
             "name": str(row["name"]),
             "current_club_name": str(row["current_club_name"]),
             "last_season": int(row["last_season"]),
             "market_value_in_eur": float(row["market_value_in_eur"]),
+            "predicted_value_eur": predicted_value_eur,
+            "diff_eur": diff_eur,
+            "diff_pct": diff_pct,
+            "valuation_status": _classify_status(diff_eur, diff_pct, fair_margin_pct),
         }
         for col in self.numeric_features:
             if col == "is_top5_league":
@@ -122,12 +158,7 @@ class FairValueService:
             if actual_market_value_eur > 0
             else 0.0
         )
-        if abs(diff_pct) <= fair_margin_pct:
-            status = "Fairly Valued"
-        elif diff_eur > 0:
-            status = "Undervalued"
-        else:
-            status = "Overvalued"
+        status = _classify_status(diff_eur, diff_pct, fair_margin_pct)
 
         return ValuationResult(
             actual_market_value_eur=float(actual_market_value_eur),
@@ -236,6 +267,11 @@ class FairValueService:
         search: str | None = None,
         position: str | None = None,
         league_group: str | None = None,
+        status: str | None = None,
+        is_top5_league: int | None = None,
+        max_age: float | None = None,
+        max_contract_months: float | None = None,
+        fair_margin_pct: float = 10.0,
         sort_by: str = "market_value_in_eur",
         order: str = "desc",
         limit: int = 20,
@@ -247,9 +283,11 @@ class FairValueService:
         if search:
             q = search.strip()
             if q:
-                mask = df["name"].str.contains(q, case=False, na=False) | df[
-                    "current_club_name"
-                ].str.contains(q, case=False, na=False)
+                mask = df["name"].str.contains(
+                    q, case=False, na=False, regex=False
+                ) | df["current_club_name"].str.contains(
+                    q, case=False, na=False, regex=False
+                )
                 df = df[mask]
 
         if position:
@@ -258,13 +296,35 @@ class FairValueService:
         if league_group:
             df = df[df["league_group"] == league_group]
 
+        if is_top5_league is not None:
+            df = df[df["is_top5_league"] == is_top5_league]
+
+        if max_age is not None:
+            df = df[df["age"] <= max_age]
+
+        if max_contract_months is not None:
+            df = df[df["contract_months_left"] <= max_contract_months]
+
+        if status is not None:
+            is_fair = df["diff_pct"].abs() <= fair_margin_pct
+            if status == "Fairly Valued":
+                df = df[is_fair]
+            elif status == "Undervalued":
+                df = df[(~is_fair) & (df["diff_eur"] > 0)]
+            elif status == "Overvalued":
+                df = df[(~is_fair) & (df["diff_eur"] <= 0)]
+            else:
+                raise ValueError(f"Unsupported valuation status filter: {status}")
+
         ascending = order == "asc"
         df = df.sort_values(by=sort_by, ascending=ascending, kind="mergesort")
 
         total = int(len(df))
         page_df = df.iloc[offset : offset + limit]
         items = [
-            PlayerRecord(**self._normalize_player_dict(row))
+            PlayerRecord(
+                **self._normalize_player_dict(row, fair_margin_pct=fair_margin_pct)
+            )
             for row in page_df.to_dict(orient="records")
         ]
 
@@ -275,12 +335,19 @@ class FairValueService:
             items=items,
         )
 
-    def get_player(self, player_id: int) -> PlayerRecord | None:
-        """Fetch a single player by player_id."""
+    def get_player(
+        self, player_id: int, fair_margin_pct: float = 10.0
+    ) -> PlayerRecord | None:
+        """Fetch a single player by player_id with valuation_status for fair_margin_pct."""
         row = self.players_by_id.get(int(player_id))
         if row is None:
             return None
-        return PlayerRecord(**row)
+        status = _classify_status(
+            diff_eur=row["diff_eur"],
+            diff_pct=row["diff_pct"],
+            fair_margin_pct=fair_margin_pct,
+        )
+        return PlayerRecord(**{**row, "valuation_status": status})
 
     def get_metadata(self) -> dict[str, Any]:
         """Return model metadata, valid categorical options, and numeric feature ranges."""

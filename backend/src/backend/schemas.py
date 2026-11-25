@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+ValuationStatus = Literal["Undervalued", "Overvalued", "Fairly Valued"]
+
 
 class PlayerFeatures(BaseModel):
     age: float = Field(..., ge=14, le=55)
@@ -47,7 +49,7 @@ class ValuationResult(BaseModel):
     actual_market_value_eur: float
     diff_eur: float
     diff_pct: float
-    status: Literal["Undervalued", "Overvalued", "Fairly Valued"]
+    status: ValuationStatus
     fair_margin_pct: float
 
 
@@ -77,6 +79,10 @@ class PlayerRecord(PlayerFeatures):
     current_club_name: str
     last_season: int
     market_value_in_eur: float
+    predicted_value_eur: float
+    diff_eur: float
+    diff_pct: float
+    valuation_status: ValuationStatus
 
 
 class PlayersListResponse(BaseModel):

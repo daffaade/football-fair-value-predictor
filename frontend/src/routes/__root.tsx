@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import {
   Link,
@@ -6,26 +7,92 @@ import {
 } from '@tanstack/react-router'
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
+import { healthQueryOptions } from '@/lib/queries'
 import type { RouterContext } from '@/router'
+
+function HealthBadge() {
+  const health = useQuery(healthQueryOptions())
+
+  if (health.isPending) {
+    return (
+      <span className="rounded border border-neutral-300 bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+        API: Checking…
+      </span>
+    )
+  }
+
+  if (health.isError) {
+    return (
+      <span className="rounded border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-800">
+        API: Offline
+      </span>
+    )
+  }
+
+  const ready = health.data.models_loaded
+  return (
+    <span
+      className={`rounded border px-2 py-0.5 text-xs font-medium ${
+        ready
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+          : 'border-amber-300 bg-amber-50 text-amber-800'
+      }`}
+    >
+      API: {ready ? 'Ready' : 'Loading'} ·{' '}
+      {health.data.total_players.toLocaleString()} players
+    </span>
+  )
+}
+
+const navLinkBase =
+  'border-b-2 border-transparent px-2 py-3 text-sm font-medium text-neutral-600 hover:text-neutral-900'
+const navLinkActive =
+  'border-b-2 border-neutral-900 px-2 py-3 text-sm font-semibold text-neutral-900'
 
 function RootLayout() {
   return (
-    <div className="min-h-svh bg-slate-950 text-slate-100 antialiased">
-      <header className="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link
-            to="/"
-            className="text-sm font-semibold tracking-tight text-slate-100 hover:text-emerald-400"
-          >
-            Football Fair Value — Scouting Workbench
-          </Link>
-          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
-            Scaffold
-          </span>
+    <div className="min-h-svh bg-neutral-50 text-neutral-900 antialiased">
+      <header className="border-b border-neutral-300 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4">
+          <div className="flex flex-wrap items-center gap-6">
+            <Link
+              to="/"
+              className="py-3 text-sm font-bold tracking-tight text-neutral-900"
+            >
+              Scouting Workbench
+            </Link>
+
+            <nav className="flex items-center gap-3" aria-label="Primary">
+              <Link
+                to="/"
+                activeOptions={{ exact: true }}
+                className={navLinkBase}
+                activeProps={{ className: navLinkActive }}
+              >
+                Scout Radar
+              </Link>
+              <Link
+                to="/simulator"
+                className={navLinkBase}
+                activeProps={{ className: navLinkActive }}
+              >
+                What-If Simulator
+              </Link>
+              <Link
+                to="/benchmarks"
+                className={navLinkBase}
+                activeProps={{ className: navLinkActive }}
+              >
+                Model Lab
+              </Link>
+            </nav>
+          </div>
+
+          <HealthBadge />
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto max-w-7xl px-4 py-6">
         <Outlet />
       </main>
 
@@ -44,24 +111,24 @@ function RootErrorComponent({ error, reset }: ErrorComponentProps) {
     error instanceof Error ? error.message : 'An unexpected error occurred.'
 
   return (
-    <div className="mx-auto max-w-xl rounded-xl border border-rose-500/30 bg-rose-950/30 p-6 text-slate-100">
-      <h1 className="text-lg font-semibold text-rose-300">
+    <div className="mx-auto max-w-xl rounded border border-rose-300 bg-rose-50 p-6 text-neutral-900">
+      <h1 className="text-lg font-semibold text-rose-900">
         Something went wrong
       </h1>
-      <p className="mt-2 text-sm text-slate-300">{message}</p>
+      <p className="mt-2 text-sm text-rose-800">{message}</p>
       <div className="mt-4 flex gap-3">
         <button
           type="button"
           onClick={() => reset()}
-          className="rounded-lg bg-rose-600 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-rose-500"
+          className="rounded border border-rose-400 bg-white px-3 py-1.5 text-sm font-medium text-rose-900 hover:bg-rose-100"
         >
           Try again
         </button>
         <Link
           to="/"
-          className="rounded-lg border border-slate-700 px-3.5 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-800"
+          className="rounded border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100"
         >
-          Back home
+          Back to Scout Radar
         </Link>
       </div>
     </div>
@@ -70,16 +137,16 @@ function RootErrorComponent({ error, reset }: ErrorComponentProps) {
 
 function RootNotFoundComponent() {
   return (
-    <div className="mx-auto max-w-xl rounded-xl border border-slate-800 bg-slate-900/70 p-6 text-slate-100">
-      <h1 className="text-lg font-semibold text-slate-100">Page not found</h1>
-      <p className="mt-2 text-sm text-slate-400">
-        The requested route does not exist yet in this workbench scaffold.
+    <div className="mx-auto max-w-xl rounded border border-neutral-300 bg-white p-6 text-neutral-900">
+      <h1 className="text-lg font-semibold">Page not found</h1>
+      <p className="mt-2 text-sm text-neutral-600">
+        The requested route does not exist in this workbench.
       </p>
       <Link
         to="/"
-        className="mt-4 inline-block rounded-lg bg-emerald-600 px-3.5 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+        className="mt-4 inline-block rounded border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-800"
       >
-        Return to overview
+        Return to Scout Radar
       </Link>
     </div>
   )
