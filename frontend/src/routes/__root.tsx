@@ -4,6 +4,7 @@ import {
   Link,
   Outlet,
   createRootRouteWithContext,
+  useSearch,
 } from '@tanstack/react-router'
 import type { ErrorComponentProps } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
@@ -50,6 +51,12 @@ const navLinkActive =
   'border-b-2 border-neutral-900 px-2 py-3 text-sm font-semibold text-neutral-900'
 
 function RootLayout() {
+  const scoutSearch = useSearch({
+    from: '/players/$playerId',
+    shouldThrow: false,
+    select: (search) => search.scout,
+  })
+
   return (
     <div className="min-h-svh bg-neutral-50 text-neutral-900 antialiased">
       <header className="border-b border-neutral-300 bg-white">
@@ -57,6 +64,7 @@ function RootLayout() {
           <div className="flex flex-wrap items-center gap-6">
             <Link
               to="/"
+              search={scoutSearch}
               className="py-3 text-sm font-bold tracking-tight text-neutral-900"
             >
               Scouting Workbench
@@ -65,6 +73,7 @@ function RootLayout() {
             <nav className="flex items-center gap-3" aria-label="Primary">
               <Link
                 to="/"
+                search={scoutSearch}
                 activeOptions={{ exact: true }}
                 className={navLinkBase}
                 activeProps={{ className: navLinkActive }}

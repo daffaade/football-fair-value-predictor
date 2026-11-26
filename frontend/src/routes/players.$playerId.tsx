@@ -13,11 +13,14 @@ import {
   formatSignedPct,
 } from '@/lib/format'
 import { playerPredictQueryOptions } from '@/lib/queries'
+import { validateScoutSearch } from '@/lib/scout-search'
+import type { ScoutSearchParams } from '@/lib/scout-search'
 import { parseNumber } from '@/lib/search-params'
 import type { PlayerFeatures } from '@/lib/types'
 
 interface PlayerInspectorSearch {
   fair_margin_pct?: number
+  scout?: ScoutSearchParams
 }
 
 const INSPECTOR_FEATURES: ReadonlyArray<keyof PlayerFeatures> = [
@@ -49,11 +52,16 @@ const INSPECTOR_FEATURES: ReadonlyArray<keyof PlayerFeatures> = [
 function validatePlayerInspectorSearch(
   raw: Record<string, unknown>,
 ): PlayerInspectorSearch {
+  const scout = raw.scout
   return {
     fair_margin_pct: parseNumber(raw.fair_margin_pct, {
       min: 0,
       max: 100,
     }),
+    scout:
+      scout !== null && typeof scout === 'object' && !Array.isArray(scout)
+        ? validateScoutSearch(scout as Record<string, unknown>)
+        : undefined,
   }
 }
 
@@ -79,6 +87,7 @@ function PlayerInspectorPage() {
         </div>
         <Link
           to="/"
+          search={search.scout}
           className="inline-block rounded border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-100"
         >
           ← Back to Scout Radar
@@ -93,6 +102,7 @@ function PlayerInspectorPage() {
         <div className="flex items-center gap-3">
           <Link
             to="/"
+            search={search.scout}
             className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
           >
             ← Scout Radar
@@ -113,7 +123,7 @@ function PlayerInspectorPage() {
               onCommit={(next) => {
                 if (next !== undefined) {
                   void navigate({
-                    search: { fair_margin_pct: next },
+                    search: (prev) => ({ ...prev, fair_margin_pct: next }),
                     replace: true,
                   })
                 }

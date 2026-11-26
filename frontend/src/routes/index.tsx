@@ -10,35 +10,17 @@ import {
 } from '@/lib/format'
 import { metadataQueryOptions, playersQueryOptions } from '@/lib/queries'
 import {
-  parseEnum,
-  parseNumber,
-  parseString,
-} from '@/lib/search-params'
+  SORT_BY_OPTIONS,
+  VALUATION_STATUSES,
+  validateScoutSearch,
+} from '@/lib/scout-search'
+import type { ScoutSearchParams } from '@/lib/scout-search'
 import type {
   PlayerSortBy,
-  SortOrder,
   ValuationStatus,
 } from '@/lib/types'
 
 const PAGE_SIZE = 20
-
-const VALUATION_STATUSES: readonly ValuationStatus[] = [
-  'Undervalued',
-  'Fairly Valued',
-  'Overvalued',
-]
-
-const SORT_BY_OPTIONS: readonly PlayerSortBy[] = [
-  'market_value_in_eur',
-  'predicted_value_eur',
-  'diff_eur',
-  'diff_pct',
-  'age',
-  'name',
-  'total_minutes',
-]
-
-const SORT_ORDERS: readonly SortOrder[] = ['desc', 'asc']
 
 const SORT_LABELS: Record<PlayerSortBy, string> = {
   market_value_in_eur: 'Actual Value (€)',
@@ -50,42 +32,6 @@ const SORT_LABELS: Record<PlayerSortBy, string> = {
   total_minutes: 'Career Minutes',
 }
 
-export interface ScoutSearchParams {
-  search?: string
-  position?: string
-  league_group?: string
-  status?: ValuationStatus
-  is_top5_league?: 0 | 1
-  max_age?: number
-  max_contract_months?: number
-  fair_margin_pct?: number
-  sort_by?: PlayerSortBy
-  order?: SortOrder
-  page?: number
-}
-
-function validateScoutSearch(raw: Record<string, unknown>): ScoutSearchParams {
-  const top5Raw = parseNumber(raw.is_top5_league, {
-    min: 0,
-    max: 1,
-    integer: true,
-  })
-
-  return {
-    search: parseString(raw.search),
-    position: parseString(raw.position),
-    league_group: parseString(raw.league_group),
-    status: parseEnum(raw.status, VALUATION_STATUSES),
-    is_top5_league: top5Raw === 0 || top5Raw === 1 ? top5Raw : undefined,
-    max_age: parseNumber(raw.max_age, { min: 14, max: 55 }),
-    max_contract_months: parseNumber(raw.max_contract_months, { min: 0 }),
-    fair_margin_pct: parseNumber(raw.fair_margin_pct, { min: 0, max: 100 }),
-    sort_by: parseEnum(raw.sort_by, SORT_BY_OPTIONS),
-    order: parseEnum(raw.order, SORT_ORDERS),
-    page: parseNumber(raw.page, { min: 1, integer: true }),
-  }
-}
-
 function ScoutRadarPage() {
   const searchParams = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -94,6 +40,12 @@ function ScoutRadarPage() {
   const sortBy = searchParams.sort_by ?? 'market_value_in_eur'
   const sortOrder = searchParams.order ?? 'desc'
   const page = searchParams.page ?? 1
+  const inspectorSearch = {
+    fair_margin_pct: fairMarginPct,
+    scout: Object.values(searchParams).some((value) => value !== undefined)
+      ? searchParams
+      : undefined,
+  }
 
   const updateFilters = (patch: Partial<ScoutSearchParams>) => {
     void navigate({
@@ -517,9 +469,7 @@ function ScoutRadarPage() {
                       <Link
                         to="/players/$playerId"
                         params={{ playerId: String(player.player_id) }}
-                        search={{
-                          fair_margin_pct: fairMarginPct,
-                        }}
+                        search={inspectorSearch}
                         className="font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-900"
                       >
                         {player.name}
@@ -562,9 +512,7 @@ function ScoutRadarPage() {
                       <Link
                         to="/players/$playerId"
                         params={{ playerId: String(player.player_id) }}
-                        search={{
-                          fair_margin_pct: fairMarginPct,
-                        }}
+                        search={inspectorSearch}
                         className="rounded border border-neutral-300 bg-white px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-100"
                       >
                         Inspect
